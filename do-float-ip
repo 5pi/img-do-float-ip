@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+DO_API="https://api.digitalocean.com"
+DO_TOKEN=
+
+CURL="curl -LSsf"
+DROPLET_ID=$($CURL "http://169.254.169.254/metadata/v1/id")
+REGION=$($CURL "http://169.254.169.254/metadata/v1/region")
+
+fatal() {
+  echo "Fatal: $@" >&2
+  exit 1
+}
+
+ocean() {
+  local action=$1
+  local path=$2
+  shift 2
+  args=$(echo "$@" | sed 's/\([^ ][^=]*\)=\([^ ]*\)/"\1": "\2",/g;s/,$//')
+  $CURL -X "$action" "$DO_API/$path" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $DO_TOKEN" \
+    -d "{ $args }" 2>&1 # If curl suceeds, output is only stdout. If fails, only stderr
+}
+
+main() {
+  [[ "$#" -lt 1 ]] && fatal "$0 floating-ip-or-name"
+  local ip=$1
+
+  DO_TOKEN=$(cat /etc/do.token 2>/dev/null) \
+    || fatal "/etc/do.token missing or unreadable"
+
+  if [[ ! "$ip" =~ "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" ]]; then
+    ip="$(getent hosts "$ip" | sed 's/ .*$//')"
+  fi
+
+	while true; do
+	  ocean POST /v2/floating_ips/$ip/actions \
+	    type=assign \
+	    "droplet_id=$DROPLET_ID" \
+	    || fatal "Couldn't assign floating ip to myself"
+		sleep 600
+	done
+}
+
+main "$@"
