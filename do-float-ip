@@ -35,13 +35,16 @@ main() {
     ip="$(getent hosts "$ip" | sed 's/ .*$//')"
   fi
 
-	while true; do
-	  ocean POST /v2/floating_ips/$ip/actions \
-	    type=assign \
-	    "droplet_id=$DROPLET_ID" \
-	    || fatal "Couldn't assign floating ip to myself"
-		sleep 600
-	done
+  while true; do
+    local assigned_to=$(ocean GET "/v2/floating_ips/$ip" | jq -r .floating_ip.droplet.id)
+    if [[ "$assigned_to" != "$DROPLET_ID" ]]; then
+      echo "$ip assigned to $assigned_to, reassigning"
+      ocean POST /v2/floating_ips/$ip/actions \
+        type=assign "droplet_id=$DROPLET_ID" \
+        || fatal "Couldn't assign floating ip to myself"
+    fi
+    sleep 600
+  done
 }
 
 main "$@"
