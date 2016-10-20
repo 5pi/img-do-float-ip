@@ -36,10 +36,10 @@ main() {
   fi
 
   while true; do
-    local assigned_to=$(ocean GET "/v2/floating_ips/$ip" | jq -r .floating_ip.droplet.id)
+    local assigned_to=$(ocean GET "v2/floating_ips/$ip" | jq -r .floating_ip.droplet.id)
     if [[ "$assigned_to" != "$DROPLET_ID" ]]; then
       echo "$ip assigned to $assigned_to, reassigning"
-      ocean POST /v2/floating_ips/$ip/actions \
+      ocean POST v2/floating_ips/$ip/actions \
         type=assign "droplet_id=$DROPLET_ID" \
         || fatal "Couldn't assign floating ip to myself"
     fi
